@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
 import 'screens/progress_screen.dart';
 import 'screens/tips_screen.dart';
+import 'screens/food_ai_screen.dart';
 import 'theme/app_theme.dart';
 
 void main() {
@@ -37,6 +38,7 @@ class _MainShellState extends State<MainShell> {
     HomeScreen(),
     ProgressScreen(),
     TipsScreen(),
+    FoodAiScreen(),
   ];
 
   @override
@@ -50,6 +52,7 @@ class _MainShellState extends State<MainShell> {
           NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Tập luyện'),
           NavigationDestination(icon: Icon(Icons.insights_outlined), selectedIcon: Icon(Icons.insights), label: 'Tiến độ'),
           NavigationDestination(icon: Icon(Icons.menu_book_outlined), selectedIcon: Icon(Icons.menu_book), label: 'Hướng dẫn'),
+          NavigationDestination(icon: Icon(Icons.camera_alt_outlined), selectedIcon: Icon(Icons.camera_alt), label: 'AI Calo'),
         ],
       ),
     );

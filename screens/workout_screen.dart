@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/workout_plan.dart';
 import '../services/progress_store.dart';
+import '../widgets/exercise_illustration.dart';
 
 class WorkoutScreen extends StatefulWidget {
   final WorkoutPlan plan;
@@ -148,8 +149,11 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                     children: [
                       Text(_isRest ? 'NGHỈ' : 'ĐANG TẬP', style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w900)),
                       const SizedBox(height: 18),
-                      Text(_isRest ? '😮‍💨' : ex.emoji, style: const TextStyle(fontSize: 70)),
-                      const SizedBox(height: 10),
+                      if (_isRest)
+                        const Text('😮‍💨', style: TextStyle(fontSize: 58))
+                      else
+                        ExerciseIllustration(exerciseName: ex.name, height: 185),
+                      const SizedBox(height: 12),
                       Text(_isRest ? 'Chuẩn bị: ${widget.plan.exercises[_index + 1].name}' : ex.name, textAlign: TextAlign.center, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
                       const SizedBox(height: 18),
                       SizedBox(

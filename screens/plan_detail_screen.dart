@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/workout_plan.dart';
 import 'workout_screen.dart';
+import '../widgets/exercise_illustration.dart';
 
 class PlanDetailScreen extends StatelessWidget {
   final WorkoutPlan plan;
@@ -53,15 +54,29 @@ class PlanDetailScreen extends StatelessWidget {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Card(
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    leading: CircleAvatar(child: Text(ex.emoji)),
-                    title: Text('${index + 1}. ${ex.name}', style: const TextStyle(fontWeight: FontWeight.w700)),
-                    subtitle: Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Text('${ex.muscle} • ${ex.band}\n${ex.durationSec}s tập • ${ex.restSec}s nghỉ'),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 112,
+                          child: ExerciseIllustration(exerciseName: ex.name, height: 96, compact: true),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('${index + 1}. ${ex.name}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                              const SizedBox(height: 5),
+                              Text('${ex.muscle} • ${ex.band}'),
+                              const SizedBox(height: 4),
+                              Text('${ex.durationSec}s tập • ${ex.restSec}s nghỉ', style: Theme.of(context).textTheme.bodySmall),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    isThreeLine: true,
                   ),
                 ),
               );
