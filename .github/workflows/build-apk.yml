@@ -22,13 +22,11 @@ jobs:
 
       - name: Repair Flutter project structure
         run: |
-          echo "Creating pubspec.yaml..."
-
           cat > pubspec.yaml <<'EOF'
           name: bandfit_home
-          description: Resistance band home workout app for Android.
+          description: Resistance band home workout and AI food calorie app.
           publish_to: 'none'
-          version: 1.0.0+1
+          version: 1.1.0+2
 
           environment:
             sdk: '>=3.3.0 <4.0.0'
@@ -37,6 +35,8 @@ jobs:
             flutter:
               sdk: flutter
             shared_preferences: ^2.5.3
+            image_picker: ^1.1.2
+            http: ^1.5.0
 
           flutter:
             uses-material-design: true
@@ -48,15 +48,12 @@ jobs:
             mv main.dart lib/main.dart
           fi
 
-          for folder in data models screens services theme
+          for folder in data models screens services theme widgets
           do
             if [ -d "$folder" ]; then
               mv "$folder" lib/
             fi
           done
-
-          echo "Project structure after repair:"
-          find . -maxdepth 3 -type f | sort
 
       - name: Create Android project
         run: |
@@ -66,6 +63,26 @@ jobs:
             --org com.bandfithome \
             .
 
+      - name: Add Android permissions
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('android/app/src/main/AndroidManifest.xml')
+          s = p.read_text()
+
+          marker = '<manifest xmlns:android="http://schemas.android.com/apk/res/android">'
+
+          replacement = '''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET"/>
+              <uses-permission android:name="android.permission.CAMERA"/>'''
+
+          if 'android.permission.CAMERA' not in s:
+              s = s.replace(marker, replacement)
+
+          p.write_text(s)
+          PY
+
       - name: Install packages
         run: flutter pub get
 
@@ -74,11 +91,13 @@ jobs:
         continue-on-error: true
 
       - name: Build release APK
-        run: flutter build apk --release
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: flutter build apk --release --dart-define=GEMINI_API_KEY="$GEMINI_API_KEY"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: BandFitHome-APK
+          name: BandFitHome-v1.1-AI-APK
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
