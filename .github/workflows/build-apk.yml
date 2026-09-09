@@ -12,7 +12,7 @@ jobs:
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -20,19 +20,60 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Check project
+      - name: Repair Flutter project structure
         run: |
-          pwd
-          ls -la
-          test -f pubspec.yaml
+          echo "Creating pubspec.yaml..."
 
-      - name: Create Android files
-        run: flutter create --platforms=android --project-name bandfit_home .
+          cat > pubspec.yaml <<'EOF'
+          name: bandfit_home
+          description: Resistance band home workout app for Android.
+          publish_to: 'none'
+          version: 1.0.0+1
 
-      - name: Get packages
+          environment:
+            sdk: '>=3.3.0 <4.0.0'
+
+          dependencies:
+            flutter:
+              sdk: flutter
+            shared_preferences: ^2.5.3
+
+          flutter:
+            uses-material-design: true
+          EOF
+
+          mkdir -p lib
+
+          if [ -f main.dart ]; then
+            mv main.dart lib/main.dart
+          fi
+
+          for folder in data models screens services theme
+          do
+            if [ -d "$folder" ]; then
+              mv "$folder" lib/
+            fi
+          done
+
+          echo "Project structure after repair:"
+          find . -maxdepth 3 -type f | sort
+
+      - name: Create Android project
+        run: |
+          flutter create \
+            --platforms=android \
+            --project-name bandfit_home \
+            --org com.bandfithome \
+            .
+
+      - name: Install packages
         run: flutter pub get
 
-      - name: Build APK
+      - name: Analyze project
+        run: flutter analyze
+        continue-on-error: true
+
+      - name: Build release APK
         run: flutter build apk --release
 
       - name: Upload APK
@@ -40,3 +81,4 @@ jobs:
         with:
           name: BandFitHome-APK
           path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
