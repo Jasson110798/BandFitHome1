@@ -1,0 +1,15 @@
+BandFit Home v1.3.2 - Internet + AI Food Scanner patch
+
+Android permission required in AndroidManifest.xml:
+<uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.CAMERA" />
+
+Important:
+- INTERNET is a normal Android permission, so Android does NOT show a runtime permission popup for it.
+- The GitHub workflow creates android/ when missing, inserts the permissions, then verifies them with grep before building.
+- lib/services/food_ai_service.dart checks Internet with InternetAddress.lookup() before calling Gemini.
+- Food images are sent to Gemini over HTTPS using package:http.
+- GEMINI_API_KEY is injected at build time from GitHub Secret.
+
+Gemini endpoint used:
+https://generativelanguage.googleapis.com/v1beta/models/<MODEL>:generateContent

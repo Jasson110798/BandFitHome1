@@ -1,0 +1,102 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Verify source
+        run: |
+          test -f pubspec.yaml
+          test -f lib/main.dart
+          test -f lib/services/food_ai_service.dart
+
+      - name: Create Android project if missing
+        run: |
+          if [ ! -d android ]; then
+            flutter create \
+              --platforms=android \
+              --project-name bandfit_home \
+              --org com.bandfithome \
+              .
+          fi
+
+      - name: Add Android Internet and Camera permissions
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          manifest = Path('android/app/src/main/AndroidManifest.xml')
+          if not manifest.exists():
+              raise SystemExit('ERROR: AndroidManifest.xml does not exist')
+
+          text = manifest.read_text()
+          marker = '<manifest xmlns:android="http://schemas.android.com/apk/res/android">'
+          required = [
+              '<uses-permission android:name="android.permission.INTERNET" />',
+              '<uses-permission android:name="android.permission.CAMERA" />',
+              '<uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />',
+              '<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />',
+          ]
+
+          if marker not in text:
+              raise SystemExit('ERROR: manifest header not found')
+
+          missing = [p for p in required if p not in text]
+          if missing:
+              text = text.replace(marker, marker + '\n    ' + '\n    '.join(missing), 1)
+              manifest.write_text(text)
+
+          print('----- AndroidManifest.xml -----')
+          print(manifest.read_text())
+          PY
+
+      - name: Verify Internet permission
+        run: |
+          grep -q 'android.permission.INTERNET' android/app/src/main/AndroidManifest.xml
+          grep -q 'android.permission.CAMERA' android/app/src/main/AndroidManifest.xml
+          echo 'OK: INTERNET and CAMERA permissions are present.'
+
+      - name: Install packages
+        run: flutter pub get
+
+      - name: Analyze project
+        run: flutter analyze
+        continue-on-error: true
+
+      - name: Verify Gemini API key
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo 'ERROR: GEMINI_API_KEY secret is missing.'
+            exit 1
+          fi
+          echo 'OK: GEMINI_API_KEY secret exists.'
+
+      - name: Build release APK
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: flutter build apk --release --dart-define=GEMINI_API_KEY="$GEMINI_API_KEY"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: BandFitHome-v1.3.2-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
