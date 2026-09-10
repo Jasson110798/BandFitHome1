@@ -40,11 +40,9 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-
           manifest = Path('android/app/src/main/AndroidManifest.xml')
           if not manifest.exists():
               raise SystemExit('ERROR: AndroidManifest.xml does not exist')
-
           text = manifest.read_text()
           marker = '<manifest xmlns:android="http://schemas.android.com/apk/res/android">'
           required = [
@@ -53,20 +51,16 @@ jobs:
               '<uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />',
               '<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />',
           ]
-
           if marker not in text:
               raise SystemExit('ERROR: manifest header not found')
-
-          missing = [p for p in required if p not in text]
+          missing = [x for x in required if x not in text]
           if missing:
               text = text.replace(marker, marker + '\n    ' + '\n    '.join(missing), 1)
               manifest.write_text(text)
-
-          print('----- AndroidManifest.xml -----')
           print(manifest.read_text())
           PY
 
-      - name: Verify Internet permission
+      - name: Verify Android permissions
         run: |
           grep -q 'android.permission.INTERNET' android/app/src/main/AndroidManifest.xml
           grep -q 'android.permission.CAMERA' android/app/src/main/AndroidManifest.xml
@@ -75,11 +69,7 @@ jobs:
       - name: Install packages
         run: flutter pub get
 
-      - name: Analyze project
-        run: flutter analyze
-        continue-on-error: true
-
-      - name: Verify Gemini API key
+      - name: Verify Gemini API key exists
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
@@ -87,7 +77,46 @@ jobs:
             echo 'ERROR: GEMINI_API_KEY secret is missing.'
             exit 1
           fi
-          echo 'OK: GEMINI_API_KEY secret exists.'
+          echo 'OK: GEMINI_API_KEY is present.'
+
+      - name: Test Gemini API before APK build
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          HTTP_CODE=$(curl -sS \
+            -o /tmp/gemini_models.json \
+            -w '%{http_code}' \
+            'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000' \
+            -H "x-goog-api-key: $GEMINI_API_KEY")
+
+          echo "Gemini models endpoint HTTP: $HTTP_CODE"
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo 'Gemini API test failed:'
+            cat /tmp/gemini_models.json
+            exit 1
+          fi
+
+          python3 - <<'PY'
+          import json
+          data = json.load(open('/tmp/gemini_models.json'))
+          models = []
+          for item in data.get('models', []):
+              methods = item.get('supportedGenerationMethods', [])
+              if 'generateContent' in methods:
+                  name = item.get('name', '')
+                  if name.startswith('models/'):
+                      name = name[7:]
+                  if 'gemini' in name and 'flash' in name and 'image' not in name and 'tts' not in name and 'live' not in name:
+                      models.append(name)
+          print('Available Flash generateContent models:', ', '.join(models[:12]))
+          if not models:
+              raise SystemExit('ERROR: No Gemini Flash model supports generateContent for this API key.')
+          PY
+
+      - name: Analyze project
+        run: flutter analyze
+        continue-on-error: true
 
       - name: Build release APK
         env:
@@ -97,6 +126,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: BandFitHome-v1.3.2-APK
+          name: BandFitHome-v1.3.3-APK
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
