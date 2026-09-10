@@ -20,71 +20,72 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Repair Flutter project structure
+      - name: Verify Flutter source
         run: |
-          cat > pubspec.yaml <<'EOF'
-          name: bandfit_home
-          description: Resistance band home workout and AI food calorie app.
-          publish_to: 'none'
-          version: 1.1.0+2
+          echo "Repository root:"
+          pwd
+          echo "Files:"
+          find . -maxdepth 3 -type f | sort | head -200
+          test -f pubspec.yaml
+          test -f lib/main.dart
 
-          environment:
-            sdk: '>=3.3.0 <4.0.0'
-
-          dependencies:
-            flutter:
-              sdk: flutter
-            shared_preferences: ^2.5.3
-            image_picker: ^1.1.2
-            http: ^1.5.0
-
-          flutter:
-            uses-material-design: true
-          EOF
-
-          mkdir -p lib
-
-          if [ -f main.dart ]; then
-            mv main.dart lib/main.dart
+      - name: Create Android project if missing
+        run: |
+          if [ ! -d android ]; then
+            echo "android/ not found. Creating Android project files..."
+            flutter create \
+              --platforms=android \
+              --project-name bandfit_home \
+              --org com.bandfithome \
+              .
+          else
+            echo "android/ already exists."
           fi
 
-          for folder in data models screens services theme widgets
-          do
-            if [ -d "$folder" ]; then
-              mv "$folder" lib/
-            fi
-          done
-
-      - name: Create Android project
-        run: |
-          flutter create \
-            --platforms=android \
-            --project-name bandfit_home \
-            --org com.bandfithome \
-            .
-
-      - name: Add Android permissions
+      - name: Patch Android permissions
         run: |
           python3 - <<'PY'
           from pathlib import Path
 
-          p = Path('android/app/src/main/AndroidManifest.xml')
-          s = p.read_text()
+          path = Path('android/app/src/main/AndroidManifest.xml')
+          if not path.exists():
+              raise SystemExit('AndroidManifest.xml not found after flutter create')
 
+          text = path.read_text()
           marker = '<manifest xmlns:android="http://schemas.android.com/apk/res/android">'
+          permissions = [
+              '<uses-permission android:name="android.permission.INTERNET" />',
+              '<uses-permission android:name="android.permission.CAMERA" />',
+              '<uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />',
+              '<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />',
+          ]
 
-          replacement = '''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <uses-permission android:name="android.permission.INTERNET"/>
-              <uses-permission android:name="android.permission.CAMERA"/>'''
+          if 'android.permission.INTERNET' not in text:
+              block = marker + '\n    ' + '\n    '.join(permissions)
+              text = text.replace(marker, block, 1)
 
-          if 'android.permission.CAMERA' not in s:
-              s = s.replace(marker, replacement)
-
-          p.write_text(s)
+          path.write_text(text)
+          print(path.read_text())
           PY
 
       - name: Install packages
         run: flutter pub get
+
+      - name: Verify exercise assets
+        run: |
+          echo "Exercise assets:"
+          find assets/exercises -maxdepth 1 -type f | sort
+          test -f assets/exercises/squat.png
+          test -f assets/exercises/standing_row.png
+          test -f assets/exercises/glute_kickback.png
+          test -f assets/exercises/chest_press.png
+          test -f assets/exercises/core_combo.png
+          test -f assets/exercises/band_punch.png
+          test -f assets/exercises/hip_hinge.png
+          test -f assets/exercises/knee_drive.png
+          test -f assets/exercises/reverse_lunge.png
+          test -f assets/exercises/standing_abduction.png
+          test -f assets/exercises/upper_finishers.png
 
       - name: Analyze project
         run: flutter analyze
@@ -93,11 +94,16 @@ jobs:
       - name: Build release APK
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: flutter build apk --release --dart-define=GEMINI_API_KEY="$GEMINI_API_KEY"
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "GEMINI_API_KEY secret is missing"
+            exit 1
+          fi
+          flutter build apk --release --dart-define=GEMINI_API_KEY="$GEMINI_API_KEY"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: BandFitHome-v1.1-AI-APK
+          name: BandFitHome-v1.3.1-APK
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
